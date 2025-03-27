@@ -108,6 +108,6 @@ async def arun(blender_path: str):
 
 @click.command()
 # XXX set platform defaults
-@click.option("--blender-path", help="Path to blender executable")
+@click.option("--blender-path", required=True, help="Path to blender executable")
 def main(blender_path: str):
     anyio.run(arun, blender_path)
