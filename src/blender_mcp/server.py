@@ -28,6 +28,7 @@ class BlenderProcess:
                 ],
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
+                bufsize=1,
                 text=True,
             )
         return self._process

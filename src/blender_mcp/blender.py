@@ -27,17 +27,19 @@ def setup():
     threading.Thread(target=stdio_loop, daemon=True).start()
 
 
-def execute(code: str, command: str, result: Queue) -> str | None:
+def execute(code: str, command: str, queue: Queue) -> str | None:
     text.from_string(code)
     try:
         if command == EVAL_SEPARATOR:
-            return eval(code, BPY_GLOBALS)
+            result = eval(code, BPY_GLOBALS)
         elif command == EXEC_SEPARATOR:
-            return exec(code, BPY_GLOBALS)
+            result = exec(code, BPY_GLOBALS)
         else:
             raise RuntimeError(f"Invalid command {command}")
     except Exception as e:
-        return "".join(traceback.format_exception(e))
+        result = "".join(traceback.format_exception(e))
+
+    queue.put(result)
 
 
 def stdio_loop():
@@ -54,6 +56,7 @@ def stdio_loop():
         if result is not None:
             sys.stdout.write(result)
         sys.stdout.write(SEPARATOR)
+        sys.stdout.write("\n")
         sys.stdout.flush()
 
 
