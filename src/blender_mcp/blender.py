@@ -54,6 +54,7 @@ def stdio_loop():
         if result is not None:
             sys.stdout.write(result)
         sys.stdout.write(SEPARATOR)
+        sys.stdout.flush()
 
 
 bpy.app.timers.register(setup, first_interval=0.1)

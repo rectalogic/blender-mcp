@@ -47,7 +47,10 @@ class BlenderProcess:
     def _run_python(self, separator: str, code: str) -> str:
         assert self.process.stdin and self.process.stdout
         self.process.stdin.write(code)
+        if not code.endswith("\n"):
+            self.process.stdin.write("\n")
         self.process.stdin.write(separator)
+        self.process.stdin.flush()
 
         lines = []
         while (line := self.process.stdout.readline()) and not line.startswith(">>>"):
