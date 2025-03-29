@@ -46,7 +46,7 @@ def stdio_loop():
         lines = []
         while (line := sys.stdin.readline()) and not line.startswith(SEPARATOR):
             lines.append(line)
-        code = "\n".join(lines)
+        code = "".join(lines)
 
         # Execute in main Blender thread
         bpy.app.timers.register(functools.partial(execute, code, line.strip(), queue))

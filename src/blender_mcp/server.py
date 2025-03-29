@@ -50,6 +50,7 @@ class BlenderProcess:
         if not code.endswith("\n"):
             self.process.stdin.write("\n")
         self.process.stdin.write(separator)
+        self.process.stdin.write("\n")
         self.process.stdin.flush()
 
         lines = []
