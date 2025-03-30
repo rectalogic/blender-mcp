@@ -89,7 +89,7 @@ def eval_python(expression: str, ctx: Context) -> str:
     If an exception occurs, the backtrace will be returned.
     """
     assert ctx.request_context and ctx.request_context.lifespan_context  # noqa: S101
-    blender = ctx.request_context.lifespan_context["blender"]
+    blender = ctx.request_context.lifespan_context.blender
     return blender.eval_python(expression)
 
 
@@ -100,7 +100,7 @@ def exec_python(code: str, ctx: Context) -> str:
     If an exception occurs, the backtrace will be returned.
     """
     assert ctx.request_context and ctx.request_context.lifespan_context  # noqa: S101
-    blender = ctx.request_context.lifespan_context["blender"]
+    blender = ctx.request_context.lifespan_context.blender
     return blender.exec_python(code)
 
 

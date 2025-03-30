@@ -31,9 +31,9 @@ def execute(code: str, command: str, queue: Queue) -> str | None:
     text.from_string(code)
     try:
         if command == EVAL_SEPARATOR:
-            result = eval(code, BPY_GLOBALS)
+            result = eval(code, BPY_GLOBALS)  # noqa: S307
         elif command == EXEC_SEPARATOR:
-            result = exec(code, BPY_GLOBALS)
+            result = exec(code, BPY_GLOBALS)  # noqa: S102
         else:
             raise RuntimeError(f"Invalid command {command}")
     except Exception as e:
