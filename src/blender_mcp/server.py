@@ -1,14 +1,12 @@
 import os
 import subprocess
 import typing as t
-from collections.abc import Generator
-from contextlib import contextmanager
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from dataclasses import dataclass
 
-import anyio
 import click
-import mcp.types as types
-from mcp.server.lowlevel import Server
-from mcp.server.stdio import stdio_server
+from mcp.server.fastmcp import Context, FastMCP
 
 
 class BlenderProcess:
@@ -20,7 +18,7 @@ class BlenderProcess:
     @property
     def process(self) -> subprocess.Popen:
         if self._process is None:
-            self._process = subprocess.Popen(
+            self._process = subprocess.Popen(  # noqa: S603
                 [
                     self.blender_path,
                     "-P",
@@ -33,7 +31,7 @@ class BlenderProcess:
             )
         return self._process
 
-    def close(self):
+    def close(self) -> None:
         if self._process is not None:
             self._process.terminate()
             try:
@@ -46,7 +44,7 @@ class BlenderProcess:
                     return
 
     def _run_python(self, separator: str, code: str) -> str:
-        assert self.process.stdin and self.process.stdout
+        assert self.process.stdin and self.process.stdout  # noqa: S101
         self.process.stdin.write(code)
         if not code.endswith("\n"):
             self.process.stdin.write("\n")
@@ -66,78 +64,51 @@ class BlenderProcess:
         return self._run_python(">>>exec", code)
 
 
-@contextmanager
-def run_blender(blender_path: str) -> Generator[BlenderProcess, t.Any, None]:
-    process = BlenderProcess(blender_path)
-    try:
-        yield process
-    finally:
-        process.close()
+@dataclass
+class BlenderContext:
+    blender: BlenderProcess
 
 
-async def arun(blender_path: str):
-    app = Server("blender-mcp")
+def blender_lifespan(blender_path: str) -> t.Callable[[FastMCP], t.AsyncContextManager[BlenderContext]]:
+    @asynccontextmanager
+    async def lifespan(server: FastMCP) -> AsyncGenerator[BlenderContext, None]:
+        blender = BlenderProcess(blender_path)
+        try:
+            yield BlenderContext(blender=blender)
+        finally:
+            blender.close()
 
-    with run_blender(blender_path) as blender:
+    return lifespan
 
-        @app.call_tool()
-        async def run_python(name: str, arguments: dict) -> list[types.TextContent]:
-            match name:
-                case "eval_python":
-                    return [
-                        types.TextContent(
-                            type="text",
-                            text=blender.eval_python(arguments["expression"]),
-                        )
-                    ]
-                case "exec_python":
-                    return [
-                        types.TextContent(
-                            type="text", text=blender.exec_python(arguments["code"])
-                        )
-                    ]
-                case n:
-                    raise RuntimeError(f"Invalid tool name {n}")
 
-        @app.list_tools()
-        async def list_tools() -> list[types.Tool]:
-            return [
-                types.Tool(
-                    name="eval_python",
-                    description="eval a Python expression in Blender. The bpy module is available. The result of the eval is returned. If an exception occurs, the backtrace will be returned.",
-                    inputSchema={
-                        "type": "object",
-                        "required": ["expression"],
-                        "properties": {
-                            "expression": {
-                                "type": "string",
-                                "description": "Python expression to eval",
-                            }
-                        },
-                    },
-                ),
-                types.Tool(
-                    name="exec_python",
-                    description="exec Python code, possibly multiple lines, in Blender. The bpy module is available. If an exception occurs, the backtrace will be returned.",
-                    inputSchema={
-                        "type": "object",
-                        "required": ["code"],
-                        "properties": {
-                            "code": {
-                                "type": "string",
-                                "description": "Python code to exec",
-                            }
-                        },
-                    },
-                ),
-            ]
+def eval_python(expression: str, ctx: Context) -> str:
+    """
+    eval a Python expression in Blender.
+    The bpy module is available.
+    The result of the eval is returned.
+    If an exception occurs, the backtrace will be returned.
+    """
+    assert ctx.request_context and ctx.request_context.lifespan_context  # noqa: S101
+    blender = ctx.request_context.lifespan_context["blender"]
+    return blender.eval_python(expression)
 
-        async with stdio_server() as (read, write):
-            await app.run(read, write, app.create_initialization_options())
+
+def exec_python(code: str, ctx: Context) -> str:
+    """
+    exec Python code, possibly multiple lines, in Blender.
+    The bpy module is available.
+    If an exception occurs, the backtrace will be returned.
+    """
+    assert ctx.request_context and ctx.request_context.lifespan_context  # noqa: S101
+    blender = ctx.request_context.lifespan_context["blender"]
+    return blender.exec_python(code)
 
 
 @click.command()
 # XXX set platform defaults
 @click.option("--blender-path", required=True, help="Path to blender executable")
-def main(blender_path: str):
-    anyio.run(arun, blender_path)
+def main(blender_path: str) -> None:
+    mcp = FastMCP("blender-mcp", lifespan=blender_lifespan(blender_path))
+    mcp.tool()(eval_python)
+    mcp.tool()(exec_python)
+    mcp.run()  # XXX pass transport
