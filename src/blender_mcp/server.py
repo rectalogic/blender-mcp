@@ -1,3 +1,4 @@
+import asyncio
 import os
 import subprocess
 import typing as t
@@ -31,17 +32,22 @@ class BlenderProcess:
             )
         return self._process
 
-    def close(self) -> None:
-        if self._process is not None:
-            self._process.terminate()
+    def _close(self, blender_process: subprocess.Popen) -> None:
+        blender_process.terminate()
+        try:
+            blender_process.communicate(timeout=5)  # drain
+            blender_process.wait(5)
+        except subprocess.TimeoutExpired:
+            blender_process.kill()
             try:
-                self._process.wait(5)
+                blender_process.communicate(timeout=5)  # drain
+                blender_process.wait(5)
             except subprocess.TimeoutExpired:
-                self._process.kill()
-                try:
-                    self._process.wait(5)
-                except subprocess.TimeoutExpired:
-                    return
+                return
+
+    async def close(self) -> None:
+        if self._process is not None and self._process.poll() is None:
+            await asyncio.to_thread(self._close, self._process)
 
     def _run_python(self, separator: str, code: str) -> str:
         assert self.process.stdin and self.process.stdout  # noqa: S101
@@ -76,7 +82,7 @@ def blender_lifespan(blender_path: str) -> t.Callable[[FastMCP], t.AsyncContextM
         try:
             yield BlenderContext(blender=blender)
         finally:
-            blender.close()
+            await blender.close()
 
     return lifespan
 
