@@ -88,7 +88,6 @@ def eval_python(expression: str, ctx: Context) -> str:
     The result of the eval is returned.
     If an exception occurs, the backtrace will be returned.
     """
-    assert ctx.request_context and ctx.request_context.lifespan_context  # noqa: S101
     blender = ctx.request_context.lifespan_context.blender
     return blender.eval_python(expression)
 
@@ -99,7 +98,6 @@ def exec_python(code: str, ctx: Context) -> str:
     The bpy module is available.
     If an exception occurs, the backtrace will be returned.
     """
-    assert ctx.request_context and ctx.request_context.lifespan_context  # noqa: S101
     blender = ctx.request_context.lifespan_context.blender
     return blender.exec_python(code)
 
@@ -108,7 +106,7 @@ def exec_python(code: str, ctx: Context) -> str:
 # XXX set platform defaults
 @click.option("--blender-path", required=True, help="Path to blender executable")
 def main(blender_path: str) -> None:
-    mcp = FastMCP("blender-mcp", lifespan=blender_lifespan(blender_path))
+    mcp = FastMCP("blender-mcp", lifespan=blender_lifespan(blender_path), log_level="ERROR")
     mcp.tool()(eval_python)
     mcp.tool()(exec_python)
     mcp.run()  # XXX pass transport
